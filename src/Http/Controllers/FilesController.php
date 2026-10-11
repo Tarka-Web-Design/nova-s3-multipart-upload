@@ -2,13 +2,14 @@
 
 namespace Ahmedkandel\NovaS3MultipartUpload\Http\Controllers;
 
-use Ahmedkandel\NovaS3MultipartUpload\NovaS3MultipartUpload;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Laravel\Nova\Http\Requests\NovaRequest;
-use Laravel\Nova\ResourceToolElement;
 
 class FilesController
 {
+    use ResolvesTool;
+
     /**
      * Model instance.
      *
@@ -35,18 +36,7 @@ class FilesController
 
         $this->model = $resource->model();
 
-        $fields = $resource->availableFields($request)
-            ->map(
-                fn ($field) => $field instanceof ResourceToolElement
-                    ? $field->assignedPanel
-                    : $field
-            );
-
-        $this->tool = $fields
-            ->whereInstanceOf(NovaS3MultipartUpload::class)
-            ->firstWhere('attribute', $request->route('field'));
-
-        abort_unless($this->tool, 404);
+        $this->tool = $this->resolveTool($request, $resource);
     }
 
     /**
@@ -120,6 +110,8 @@ class FilesController
 
         $this->authorize($request, 'Upload');
 
+        $this->checkUploadedFile($request);
+
         if ($this->tool->hasSingleFile() && $this->model->{$this->tool->attribute}) {
             $this->deletePreviousFile();
         }
@@ -139,6 +131,57 @@ class FilesController
         return [
             'message' => __('Added file :filename', ['filename' => $request->input('fileName')]),
         ];
+    }
+
+    /**
+     * Make sure the file being saved is one this tool uploaded, and no
+     * bigger than it allows. The uploader keeps to `restrictions()` in the
+     * browser, but the browser is not to be trusted with it: the file is
+     * already in the bucket by now, so one that is too big is removed.
+     *
+     * The size saved is the one the bucket reports, not the browser's.
+     *
+     * @param  \Laravel\Nova\Http\Requests\NovaRequest  $request
+     * @return void
+     */
+    private function checkUploadedFile($request)
+    {
+        $key = (string) $request->input('fileKey');
+
+        abort_if($key === '' || Str::contains($key, '..'), 422, __('The file could not be saved.'));
+
+        if ($this->tool->storagePath) {
+            abort_unless(Str::startsWith($key, $this->tool->storagePath . '/'), 422, __('The file could not be saved.'));
+        }
+
+        $disk = Storage::disk($this->tool->disk);
+
+        abort_unless($disk->exists($key), 422, __('The file did not finish uploading. Please try again.'));
+
+        $size = $disk->size($key);
+        $max = $this->tool->meta()['restrictions']['maxFileSize'] ?? null;
+
+        if ($max && $size > $max) {
+            $disk->delete($key);
+
+            abort(422, __('The file is too big. The most it can be is :size.', ['size' => $this->formatBytes($max)]));
+        }
+
+        $request->merge(['fileSize' => $size]);
+    }
+
+    /**
+     * Bytes as a person would write them: 500 MB, 1.5 GB.
+     *
+     * @param  int  $bytes
+     * @return string
+     */
+    private function formatBytes($bytes)
+    {
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $power = $bytes > 0 ? min((int) floor(log($bytes, 1024)), count($units) - 1) : 0;
+
+        return round($bytes / (1024 ** $power), 1) . ' ' . $units[$power];
     }
 
     /**

@@ -1,6 +1,7 @@
 let mix = require('laravel-mix')
+let NovaExtension = require('./nova.mix')
 
-require('./nova.mix')
+mix.extend('nova', new NovaExtension())
 
 mix
   .setPublicPath('dist')
@@ -11,4 +12,5 @@ mix
         require('postcss-logical'),
         require('postcss-dir-pseudo-class'),
     ])
-  .nova('ahmedkandel/nova-s3-multipart-upload');
+  .nova('ahmedkandel/nova-s3-multipart-upload')
+  .disableNotifications();

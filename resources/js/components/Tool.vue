@@ -95,7 +95,7 @@ export default {
                 )
                 .catch((error) =>
                     {
-                        Nova.error(error.message);
+                        Nova.error((error.response && error.response.data && error.response.data.message) || error.message);
                     }
                 )
                 .then(() =>

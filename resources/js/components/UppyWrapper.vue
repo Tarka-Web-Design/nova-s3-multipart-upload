@@ -24,7 +24,7 @@ export default {
         return this.initUppy();
     },
 
-    beforeDestroy()
+    beforeUnmount()
     {
         this.uppy.close();
     },
@@ -38,8 +38,9 @@ export default {
 
         initUppy()
         {
-            let locale = window.NovaUppyLocale || {strings: {}};
-                _.merge(locale.strings, this.withMeta.locale);
+            // Nova 5 no longer puts lodash on window, so no _.merge here.
+            let baseLocale = window.NovaUppyLocale || {strings: {}};
+            let locale = {...baseLocale, strings: {...baseLocale.strings, ...(this.withMeta.locale || {})}};
 
             let plugins = [];
 

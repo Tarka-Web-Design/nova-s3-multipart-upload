@@ -162,7 +162,7 @@ class NovaS3MultipartUpload extends ResourceTool
      *
      * @return string
      */
-    public function component()
+    public function toolComponent()
     {
         return 'nova-s3-multipart-upload';
     }

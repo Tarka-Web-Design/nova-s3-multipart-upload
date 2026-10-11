@@ -1,4 +1,10 @@
 ### Releases
+- v3.0.0 (Tarka Web Design fork)
+	- Laravel Nova 5 only: `laravel/nova ^5.0`, `toolComponent()`, the element's `panel`, JavaScript rebuilt against Nova 5's globals
+	- Keys are relative to the disk, so a disk with a `root` works
+	- Saving checks the file is in the bucket, inside `path()`, and within `maxFileSize`; the size saved is the one S3 reports
+	- No `x-amz-meta-*` headers, so file names outside ASCII upload
+	- Server error messages are shown in Nova's toasts
 - [v1.2.0](https://github.com/ahmedkandel/nova-s3-multipart-upload/releases/tag/v1.2.0) 
 	- Enhancement: Add content disposition [#2](https://github.com/ahmedkandel/nova-s3-multipart-upload/issues/2)
 	- Enhancement: Add S3 CORS configuration in JSON [#5](https://github.com/ahmedkandel/nova-s3-multipart-upload/pull/5/files)

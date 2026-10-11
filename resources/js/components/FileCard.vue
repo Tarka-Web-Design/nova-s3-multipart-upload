@@ -61,21 +61,23 @@
             />
         </div>
 
-        <portal to="modals">
-            <DeleteResourceModal
-              mode="delete"
-              :show="deleteModalOpen"
-              @confirm="removeFile"
-              @close="closeDeleteModal"
-            >
-              <ModalHeader v-text="__('Delete File')" />
-              <ModalContent>
-                <p class="leading-normal">
-                  {{ __('Are you sure you want to delete this file?') }}
-                </p>
-              </ModalContent>
-            </DeleteResourceModal>
-        </portal>
+        <DeleteResourceModal
+          mode="delete"
+          :show="deleteModalOpen"
+          @confirm="removeFile"
+          @close="closeDeleteModal"
+        >
+          <template #header>
+            <ModalHeader v-text="__('Delete File')" />
+          </template>
+          <template #content>
+            <ModalContent>
+              <p class="leading-normal">
+                {{ __('Are you sure you want to delete this file?') }}
+              </p>
+            </ModalContent>
+          </template>
+        </DeleteResourceModal>
     </card>
 </template>
 
@@ -83,11 +85,10 @@
 import { render } from 'preact';
 import getFileType from "@uppy/utils/lib/getFileType";
 import getFileTypeIcon from "@uppy/dashboard/lib/utils/getFileTypeIcon";
-import DeleteResourceModal from '@/components/Modals/DeleteResourceModal';
 import { Button } from 'laravel-nova-ui'
 
 export default {
-    components: { DeleteResourceModal, Button },
+    components: { Button },
     props: ["fileKey", "fileName", "fileSize", "fileMeta", "apiUri", "withMeta"],
 
     data()
@@ -151,7 +152,7 @@ export default {
                 )
                 .catch((error) =>
                     {
-                        Nova.error(error.message);
+                        Nova.error((error.response && error.response.data && error.response.data.message) || error.message);
                     }
                 );
         },
@@ -184,7 +185,7 @@ export default {
                 )
                 .catch((error) =>
                     {
-                        Nova.error(error.message);
+                        Nova.error((error.response && error.response.data && error.response.data.message) || error.message);
                     }
                 );
         },

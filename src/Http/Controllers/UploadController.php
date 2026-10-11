@@ -2,13 +2,13 @@
 
 namespace Ahmedkandel\NovaS3MultipartUpload\Http\Controllers;
 
-use Ahmedkandel\NovaS3MultipartUpload\NovaS3MultipartUpload;
 use Illuminate\Support\Str;
 use Laravel\Nova\Http\Requests\NovaRequest;
-use Laravel\Nova\ResourceToolElement;
 
 class UploadController
 {
+    use ResolvesTool;
+
     /**
      * Resource tool instance.
      *
@@ -41,20 +41,7 @@ class UploadController
      */
     protected function init($request)
     {
-        $resource = $request->findResourceOrFail();
-
-        $fields = $resource->availableFields($request)
-            ->map(
-                fn ($field) => $field instanceof ResourceToolElement
-                    ? $field->assignedPanel
-                    : $field
-            );
-
-        $this->tool = $fields
-            ->whereInstanceOf(NovaS3MultipartUpload::class)
-            ->firstWhere('attribute', $request->route('field'));
-
-        abort_unless($this->tool, 404);
+        $this->tool = $this->resolveTool($request);
 
         abort_unless($this->tool->element->authorizedToSee($request), 403);
 
@@ -64,7 +51,7 @@ class UploadController
     }
 
     /**
-     * Generate file storage key
+     * Generate file storage key, relative to the disk.
      *
      * @param string $fileName
      * @return string
@@ -73,9 +60,30 @@ class UploadController
     {
         $path = $this->tool->storagePath ? $this->tool->storagePath . '/' : '';
         $name = $this->tool->keepOriginalName ? pathinfo($fileName, PATHINFO_FILENAME) : (string) Str::uuid();
-        $extension = pathinfo($fileName, PATHINFO_EXTENSION);
+        $extension = preg_replace('/[^A-Za-z0-9]/', '', (string) pathinfo($fileName, PATHINFO_EXTENSION));
 
         return $path . $name . ($extension ? '.' . $extension : '');
+    }
+
+    /**
+     * The key in the bucket of an upload already under way. Uppy hands back
+     * the key it was given when the upload was created, which is relative to
+     * the disk and inside the tool's storage path.
+     *
+     * @param  \Laravel\Nova\Http\Requests\NovaRequest  $request
+     * @return string
+     */
+    private function uploadKey($request)
+    {
+        $key = (string) $request->query('key');
+
+        abort_if($key === '' || Str::contains($key, '..'), 422);
+
+        if ($this->tool->storagePath) {
+            abort_unless(Str::startsWith($key, $this->tool->storagePath . '/'), 403);
+        }
+
+        return $this->bucketKey($this->tool, $key);
     }
 
     /**
@@ -88,15 +96,19 @@ class UploadController
     {
         $this->init($request);
 
+        $key = $this->generateFileKey((string) $request->input('filename'));
+
+        // The file's own details stay with the model rather than travelling
+        // as x-amz-meta headers, which S3 only takes in plain ASCII: a file
+        // called "Café.mp4" would have failed to start uploading.
         $data = $this->s3Client->createMultipartUpload([
             'Bucket' => config("filesystems.disks.{$this->tool->disk}.bucket"),
-            'Key' => $this->generateFileKey($request->input('filename')),
-            'ContentType' => $request->input('type'),
-            'Metadata' => $request->input('metadata'),
+            'Key' => $this->bucketKey($this->tool, $key),
+            'ContentType' => $request->input('type') ?: 'application/octet-stream',
         ]);
 
         return [
-            'key' => $data['Key'],
+            'key' => $key,
             'uploadId' => $data['UploadId'],
         ];
     }
@@ -113,7 +125,7 @@ class UploadController
 
         $data = $this->s3Client->listParts([
             'Bucket' => config("filesystems.disks.{$this->tool->disk}.bucket"),
-            'Key' => $request->query('key'),
+            'Key' => $this->uploadKey($request),
             'UploadId' => $request->route('uploadId'),
             'PartNumberMarker' => 0,
         ]);
@@ -132,7 +144,7 @@ class UploadController
     {
         $command = $this->s3Client->getCommand('UploadPart', [
             'Bucket' => config("filesystems.disks.{$this->tool->disk}.bucket"),
-            'Key' => $request->query('key'),
+            'Key' => $this->uploadKey($request),
             'UploadId' => $request->route('uploadId'),
             'PartNumber' => $partNumber,
         ]);
@@ -193,7 +205,7 @@ class UploadController
 
         $data = $this->s3Client->completeMultipartUpload([
             'Bucket' => config("filesystems.disks.{$this->tool->disk}.bucket"),
-            'Key' => $request->query('key'),
+            'Key' => $this->uploadKey($request),
             'UploadId' => $request->route('uploadId'),
             'MultipartUpload' => [
                 'Parts' => $request->input('parts'),
@@ -217,7 +229,7 @@ class UploadController
 
         $this->s3Client->abortMultipartUpload([
             'Bucket' => config("filesystems.disks.{$this->tool->disk}.bucket"),
-            'Key' => $request->query('key'),
+            'Key' => $this->uploadKey($request),
             'UploadId' => $request->route('uploadId'),
         ]);
 

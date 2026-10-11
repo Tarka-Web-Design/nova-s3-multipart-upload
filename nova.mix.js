@@ -1,7 +1,6 @@
-const mix = require('laravel-mix')
-const webpack = require('webpack')
-const path = require('path')
-
+// Nova 5 puts Vue and its own packages on window, so a tool's bundle uses
+// those rather than carrying copies (the same as laravel/nova-devtool's
+// nova.mix.js, kept here so a build needs nothing from a Nova install).
 class NovaExtension {
   name() {
     return 'nova-extension'
@@ -14,15 +13,9 @@ class NovaExtension {
   webpackConfig(webpackConfig) {
     webpackConfig.externals = {
       vue: 'Vue',
-    }
-
-    webpackConfig.resolve.alias = {
-      ...(webpackConfig.resolve.alias || {}),
-      'laravel-nova': path.join(
-        __dirname,
-        'vendor/laravel/nova/resources/js/mixins/packages.js'
-      ),
-      '@': path.join(__dirname, './vendor/laravel/nova/resources/js'),
+      'laravel-nova': 'LaravelNova',
+      'laravel-nova-ui': 'LaravelNovaUi',
+      'laravel-nova-util': 'LaravelNovaUtil',
     }
 
     webpackConfig.output = {
@@ -31,4 +24,4 @@ class NovaExtension {
   }
 }
 
-mix.extend('nova', new NovaExtension())
+module.exports = NovaExtension

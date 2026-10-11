@@ -1,10 +1,31 @@
-# Nova S3 Multipart Upload
-
-[![Latest Version on Packagist](https://img.shields.io/packagist/v/ahmedkandel/nova-s3-multipart-upload.svg)](https://github.com/ahmedkandel/nova-s3-multipart-upload) [![Total Downloads](https://img.shields.io/packagist/dt/ahmedkandel/nova-s3-multipart-upload.svg)](https://github.com/ahmedkandel/nova-s3-multipart-upload) [![License](https://img.shields.io/packagist/l/ahmedkandel/nova-s3-multipart-upload.svg)](https://github.com/ahmedkandel/nova-s3-multipart-upload/blob/master/LICENSE.md)
+# Nova S3 Multipart Upload (Nova 5 fork)
 
 A Laravel Nova resource tool to upload files directly to Amazon S3. You can (upload | download | delete) single, multiple, small or big files.
 
-![screenshot](https://github.com/ahmedkandel/nova-s3-multipart-upload/blob/master/docs/screenshot.png?raw=true)
+This is Tarka Web Design's fork of [ahmedkandel/nova-s3-multipart-upload](https://github.com/ahmedkandel/nova-s3-multipart-upload), which stopped at Nova 4. It is the same tool, under the same namespace, made to run on **Laravel Nova 5**:
+
+- Composer requires `laravel/nova: ^5.0`, and the package is `tarka-web-design/nova-s3-multipart-upload`.
+- The controllers find the tool through the element's `panel` (Nova 5's name for Nova 4's `assignedPanel`), and the tool names its component with `toolComponent()`.
+- The JavaScript is rebuilt against Nova 5's globals (`Vue`, `LaravelNova`, `LaravelNovaUi`): no lodash global, Nova's own delete modal and its named slots, and Uppy closed on unmount.
+- A disk with a `root` works: keys are stored relative to the disk, as Laravel's `Storage` reads them, and S3 is given the full key.
+- On save, the file must be in the bucket, inside the tool's `path()`, and no bigger than `restrictions(['maxFileSize' => …])`. A file that is too big is deleted from the bucket and refused, and the size saved is the one S3 reports.
+- File details are no longer sent to S3 as `x-amz-meta-*` headers, which S3 only takes in ASCII (a file called `Café.mp4` could not start uploading).
+
+Install it from GitHub:
+
+```json
+"repositories": [
+    { "type": "vcs", "url": "https://github.com/Tarka-Web-Design/nova-s3-multipart-upload" }
+],
+```
+
+```bash
+composer require "tarka-web-design/nova-s3-multipart-upload:^3.0"
+```
+
+The browser sends the pieces of a file straight to the bucket with `PUT`, so the bucket's CORS rules must allow `PUT` from the site and expose the `ETag` header (see [S3 configuration](#%EF%B8%8F-s3-configuration)). The disk's IAM user needs `s3:PutObject` (which covers starting, sending and finishing a multipart upload), plus `s3:AbortMultipartUpload` for a cancelled upload and `s3:ListMultipartUploadParts` to resume one.
+
+Everything below is the original documentation, and still applies.
 
 ### ⚡ Features
 
@@ -21,7 +42,7 @@ A Laravel Nova resource tool to upload files directly to Amazon S3. You can (upl
 ### 📌 Installation
 
 ```bash
-composer require "ahmedkandel/nova-s3-multipart-upload"
+composer require "tarka-web-design/nova-s3-multipart-upload:^3.0"
 ```
 
 ### 💡 Usage
